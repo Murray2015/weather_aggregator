@@ -4,11 +4,13 @@ import requests
 from abc import ABC
 from math import radians, cos, sin, asin, sqrt
 from xml.etree import ElementTree
+import pgeocode
 
 
 # Load env variables
 load_dotenv()
 MET_OFFICE_API_KEY = os.getenv("MET_OFFICE_API_KEY")
+OPEN_WEATHER_API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
 
 
 class WeatherDataClient():
@@ -17,6 +19,13 @@ class WeatherDataClient():
 
     def get_forecast(self):
         raise NotImplementedError
+
+    @staticmethod
+    def geocode_postcode(country, postcode):
+        """Returns the lat and lon of the nearest point to the provided postcode"""
+        nomi = pgeocode.Nominatim(country)
+        query = nomi.query_postal_code(postcode)
+        return (query['latitude'], query['longitude'])
 
     @staticmethod
     def haversine(lat1, lon1, lat2, lon2):
@@ -94,6 +103,14 @@ class MetOfficeClient(WeatherDataClient):
 class BBCClient(WeatherDataClient):
     def __init__(self):
         self.base_url = "https://weather-broker-cdn.api.bbci.co.uk/en/forecast/rss/3day/2643123"
+        temp = "weather-broker-cdn.api.bbci.co.uk/en/maps/forecasts-observations/03131311"
+        # 03131123
+        # 03131301
+        # 03131132
+        # 03131310
+        # 03131133
+        # 03131311
+        temp = "weather-broker-cdn.api.bbci.co.uk/en/forecast/aggregated/2655603"
 
     def get_forecast(self):
         response = requests.get(self.base_url)
@@ -104,5 +121,22 @@ class BBCClient(WeatherDataClient):
         # print(tree.find("channel/title").text)
 
 
-bbc = BBCClient()
-bbc.get_forecast()
+# bbc = BBCClient()
+# bbc.get_forecast()
+
+
+# Open Weather
+class OpenWeatherClient(WeatherDataClient):
+    def __init__(self):
+        lat = 52.4862
+        lon = -1.8904
+        part = "minutely"
+        self.url = f"https://api.openweathermap.org/data/2.5/onecall?lat={lat}&lon={lon}&exclude={part}&appid={OPEN_WEATHER_API_KEY}"
+
+    def get_forecast(self):
+        return requests.get(self.url).content
+
+
+# open_weather = OpenWeatherClient()
+# print(open_weather.geocode_postcode('gb', 'tq12 5sa'))
+# print(open_weather.get_forecast())
