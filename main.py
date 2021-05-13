@@ -11,6 +11,7 @@ import pgeocode
 load_dotenv()
 MET_OFFICE_API_KEY = os.getenv("MET_OFFICE_API_KEY")
 OPEN_WEATHER_API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
+ACCUWEATHER_API_KEY = os.getenv("ACCUWEATHER_API_KEY")
 TOMORROW_API_KEY = os.getenv("TOMORROW_API_KEY")
 THE_RAINERY_API_KEY = os.getenv("THE_RAINERY_API_KEY")
 STORM_GLASS_API_KEY = os.getenv("STORM_GLASS_API_KEY")
@@ -148,27 +149,28 @@ class OpenWeatherClient(WeatherDataClient):
 
 
 # AccuWeather
-# class AccuWeatherClient(WeatherDataClient):
-#     def __init__(self):
-#         self.url = "https://accuweatherstefan-skliarovv1.p.rapidapi.com/getDailyForecastByLocationKey"
-#         # self.url = "https://www.accuweather.com/en/us/new-york-ny/10017/weather-forecast/349727"
-#         self.payload = "days=3&apiKey=6a0ce28fe1mshfa71e509a3e2d47p15ea4ejsn8984b9cb5c71&locationKey=EUR|DK|DA007|AALBORG"
-#         self.headers = {
-#             'content-type': "application/x-www-form-urlencoded",
-#             'x-rapidapi-key': "6a0ce28fe1mshfa71e509a3e2d47p15ea4ejsn8984b9cb5c71",
-#             'x-rapidapi-host': "AccuWeatherstefan-skliarovV1.p.rapidapi.com"
-#         }
+class AccuWeatherClient(WeatherDataClient):
+    def __init__(self):
+        self.url = "http://dataservice.accuweather.com/forecasts/v1/hourly/120hour/{locationKey}"
+        self.location_url = "http://dataservice.accuweather.com/locations/v1/cities/geoposition/search"
 
-#     # def get_forecast(self):
-#     #     print("Getting forecast...")
-#     #     response = requests.post(
-#     #         self.url, data=self.payload, headers=self.headers)
-#     #     print("Got forecast...")
-#     #     print(response.text)
+    def get_location_code(self, lat, lon):
+        endpoint = f"?apikey={ACCUWEATHER_API_KEY}&q={lat}%2C{lon}&language=en-us&details=true"
+        response = requests.get(self.location_url + endpoint)
+        response_data = response.json()
+        print(response_data)
+        self.location_code = response_data['Key']
+
+    def get_forecast(self):
+        endpoint = f"/forecasts/v1/hourly/12hour/{self.location_code}?apikey={ACCUWEATHER_API_KEY}&language=en-gb&details=true&metric=true"
+        response = requests.get(self.url)
+        print(response.text)
 
 
-# accuweather = AccuWeatherClient()
-# accuweather.get_forecast()
+accuweather = AccuWeatherClient()
+accuweather.get_location_code(lat=52.5, lon=-2)
+accuweather.get_forecast()
+
 
 class TomorrowIOClient(WeatherDataClient):
     def __init__(self):
