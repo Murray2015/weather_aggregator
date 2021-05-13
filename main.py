@@ -11,6 +11,11 @@ import pgeocode
 load_dotenv()
 MET_OFFICE_API_KEY = os.getenv("MET_OFFICE_API_KEY")
 OPEN_WEATHER_API_KEY = os.getenv("OPEN_WEATHER_API_KEY")
+TOMORROW_API_KEY = os.getenv("TOMORROW_API_KEY")
+THE_RAINERY_API_KEY = os.getenv("THE_RAINERY_API_KEY")
+STORM_GLASS_API_KEY = os.getenv("STORM_GLASS_API_KEY")
+WEATHERBIT_IO_API_KEY = os.getenv("WEATHERBIT_IO_API_KEY")
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 
 class WeatherDataClient():
@@ -140,3 +145,107 @@ class OpenWeatherClient(WeatherDataClient):
 # open_weather = OpenWeatherClient()
 # print(open_weather.geocode_postcode('gb', 'tq12 5sa'))
 # print(open_weather.get_forecast())
+
+
+# AccuWeather
+# class AccuWeatherClient(WeatherDataClient):
+#     def __init__(self):
+#         self.url = "https://accuweatherstefan-skliarovv1.p.rapidapi.com/getDailyForecastByLocationKey"
+#         # self.url = "https://www.accuweather.com/en/us/new-york-ny/10017/weather-forecast/349727"
+#         self.payload = "days=3&apiKey=6a0ce28fe1mshfa71e509a3e2d47p15ea4ejsn8984b9cb5c71&locationKey=EUR|DK|DA007|AALBORG"
+#         self.headers = {
+#             'content-type': "application/x-www-form-urlencoded",
+#             'x-rapidapi-key': "6a0ce28fe1mshfa71e509a3e2d47p15ea4ejsn8984b9cb5c71",
+#             'x-rapidapi-host': "AccuWeatherstefan-skliarovV1.p.rapidapi.com"
+#         }
+
+#     # def get_forecast(self):
+#     #     print("Getting forecast...")
+#     #     response = requests.post(
+#     #         self.url, data=self.payload, headers=self.headers)
+#     #     print("Got forecast...")
+#     #     print(response.text)
+
+
+# accuweather = AccuWeatherClient()
+# accuweather.get_forecast()
+
+class TomorrowIOClient(WeatherDataClient):
+    def __init__(self):
+        self.url = f'https://api.tomorrow.io/v4/timelines?location=-73.98529171943665,40.75872069597532&fields=temperature,precipitationIntensity,precipitationType,windSpeed,windGust,windDirection,temperature,temperatureApparent,cloudCover,cloudBase,cloudCeiling,weatherCode&timesteps=1h&units=metric&apikey={TOMORROW_API_KEY}'
+
+    def get_forecast(self):
+        res = requests.get(self.url)
+        print(res.content)
+
+
+# tomorrow_io = TomorrowIOClient()
+# tomorrow_io.get_forecast()
+
+
+class TheRaineryClient(WeatherDataClient):
+    def __init__(self):
+        self.headers = {'x-api-key': THE_RAINERY_API_KEY}
+
+    def get_forecast(self):
+        response = requests.get('https://api.therainery.com/forecast/weather',
+                                params={
+                                    'latitude': 48.8582,
+                                    'longitude': 2.2945,
+                                }, headers=self.headers)
+
+        print(response.text)
+
+
+# the_rainery = TheRaineryClient()
+# the_rainery.get_forecast()
+
+class StormGlassClient(WeatherDataClient):
+    def __init__(self):
+        self.base_url = "https://api.stormglass.io/v2"
+        self.weather_endpoint = "/weather/point"
+        self.params = {"lat": 52, "lng": -1, "params": ','.join(['airTemperature', 'pressure', 'cloudCover', 'gust', 'humidity', 'precipitation', 'swellDirection', 'swellHeight', 'swellPeriod',
+                                                                'secondarySwellPeriod', 'secondarySwellDirection', 'secondarySwellHeight', 'visibility', 'waterTemperature', 'waveDirection', 'waveHeight', 'wavePeriod', 'windDirection', 'windSpeed'])}
+        self.headers = {'Authorization': STORM_GLASS_API_KEY
+                        }
+
+    def get_forecast(self):
+        response = requests.get(
+            self.base_url + self.weather_endpoint, params=self.params, headers=self.headers)
+        print(response.json())
+
+
+# storm_glass = StormGlassClient()
+# storm_glass.get_forecast()
+
+class WeatherbitIoClient(WeatherDataClient):
+    def __init__(self):
+        self.base_url = "http://api.weatherbit.io/v2.0/forecast/hourly"
+        self.endpoint = F"?lang=en&key={WEATHERBIT_IO_API_KEY}"
+
+    def get_forecast(self, city=None, country=None, lat=None, lon=None):
+        if city and country:
+            response = requests.get(
+                self.base_url + self.endpoint + f"&city={city}&country={country}")
+        elif lat and lon:
+            response = requests.get(
+                self.base_url + self.endpoint + f"&lat={lat}&lon={lon}")
+        print(response.json())
+
+
+# weatherbit_io = WeatherbitIoClient()
+# weatherbit_io.get_forecast(city="Birmingham", country="UK")
+
+
+class WeatherApiClient(WeatherDataClient):
+    def __init__(self):
+        self.base_url = f"http://api.weatherapi.com/v1/"
+
+    def get_forecast(self, city=None, postcode=None):
+        endpoint = f"forecast.json?key={WEATHER_API_KEY}&q={city or postcode}&days=3&aqi=no&alerts=no"
+        response = requests.get(self.base_url + endpoint)
+        print(response.json())
+
+
+weather_api = WeatherApiClient()
+weather_api.get_forecast("Birmingham")
