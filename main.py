@@ -1,12 +1,14 @@
 from dotenv import load_dotenv
 import os
 import requests
-from abc import ABC
+from abc import ABC, abstractmethod
 from math import radians, cos, sin, asin, sqrt
 from xml.etree import ElementTree
 import pgeocode
 from geopy.geocoders import Nominatim
 from datetime import datetime, timedelta
+import numpy as np
+
 from definitions import *
 
 
@@ -22,16 +24,23 @@ WEATHERBIT_IO_API_KEY = os.getenv("WEATHERBIT_IO_API_KEY")
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 
-class WeatherDataClient():
+class WeatherDataClient(ABC):
     def __init__(self):
         raise NotImplementedError
 
+    @abstractmethod
+    def process_data(self, data: any):
+        raise NotImplementedError
+
+    @abstractmethod
     def get_forecast_lat_lon(self, lat: float, lon: float):
         raise NotImplementedError
 
+    @abstractmethod
     def get_forecast_postcode(self, postcode: str):
         raise NotImplementedError
 
+    @abstractmethod
     def get_forecast_city_country(self, city: str, country: str):
         raise NotImplementedError
 
@@ -43,6 +52,8 @@ class WeatherDataClient():
                              ', '.join(pgeocode.COUNTRIES_VALID))
         nomi = pgeocode.Nominatim(country_code)
         query = nomi.query_postal_code(postcode)
+        if str(query['latitude']) == 'nan' or str(query['longitude']) == 'nan':
+            raise ValueError("Couldn't geocode that postcode.")
         return (query['latitude'], query['longitude'])
 
     @staticmethod
@@ -161,13 +172,12 @@ class MetOfficeClient(WeatherDataClient):
 # print('get_forecast_lat_lon', met_office_client.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
 # print('get_forecast_postcode',
-#       met_office_client.get_forecast_postcode('GB', 'b170hs'))
+#       met_office_client.get_forecast_postcode('GB', 'b17 0hs'))
 # print('get_forecast_city_country',
 #       met_office_client.get_forecast_city_country("Birmingham", "uk"))
 
 
 # BBC Weather RSS
-
 class BBCClient(WeatherDataClient):
     def __init__(self):
         self.base_url = "https://weather-broker-cdn.api.bbci.co.uk/en/forecast/rss/3day/2643123"
@@ -196,18 +206,40 @@ class BBCClient(WeatherDataClient):
 # Open Weather
 class OpenWeatherClient(WeatherDataClient):
     def __init__(self):
-        lat = 52.4862
-        lon = -1.8904
-        part = "minutely"
-        self.url = f"https://api.openweathermap.org/data/2.5/onecall?lat={lat}&lon={lon}&exclude={part}&appid={OPEN_WEATHER_API_KEY}"
+        self.exclude = "minutely"
+        self.base_url = f"https://api.openweathermap.org/data/2.5/onecall"
 
     def get_forecast(self):
-        return requests.get(self.url).content
+        pass
+
+    def process_data(self):
+        pass
+
+    def get_forecast_postcode(self, country, postcode):
+        lat, lon = self.geocode_postcode(country, postcode)
+        self.get_forecast_lat_lon(lat, lon)
+
+    def get_forecast_city_country(self):
+        pass
+
+    def get_forecast_lat_lon(self, lat, lon):
+        params = {
+            'lat': lat,
+            'lon': lon,
+            'exclude': self.exclude,
+            'appid': OPEN_WEATHER_API_KEY
+        }
+        response = requests.get(self.base_url, params=params)
+        return response.json()
 
 
 # open_weather = OpenWeatherClient()
-# print(open_weather.geocode_postcode('gb', 'tq12 5sa'))
-# print(open_weather.get_forecast())
+# print('get_forecast_lat_lon', open_weather.get_forecast_lat_lon(
+#     lat=50.73862, lon=-2.90325))
+# print('get_forecast_postcode',
+#       open_weather.get_forecast_postcode('GB', 'b170hs'))
+# print('get_forecast_city_country',
+#       met_office_client.get_forecast_city_country("Birmingham", "uk"))
 
 
 # AccuWeather
