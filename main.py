@@ -5,6 +5,7 @@ from abc import ABC
 from math import radians, cos, sin, asin, sqrt
 from xml.etree import ElementTree
 import pgeocode
+from geopy.geocoders import Nominatim
 from datetime import datetime, timedelta
 from definitions import *
 
@@ -148,14 +149,21 @@ class MetOfficeClient(WeatherDataClient):
         lat, lon = self.geocode_postcode(country, postcode)
         self.get_forecast_lat_lon(lat, lon)
 
+    def get_forecast_city_country(self, city, country):
+        geolocator = Nominatim(user_agent="my_test")
+        location = geolocator.geocode(f"{city}, {country}")
+        self.get_forecast_lat_lon(
+            lat=location.latitude, lon=location.longitude)
+
 
 # Met office testing
-met_office_client = MetOfficeClient()
+# met_office_client = MetOfficeClient()
 # print('get_forecast_lat_lon', met_office_client.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
-print('get_forecast_postcode',
-      met_office_client.get_forecast_postcode('GB', 'b170hs'))
-# print('get_forecast_city_country', met_office_client.get_forecast_city_country("Birmingham", "uk"))
+# print('get_forecast_postcode',
+#       met_office_client.get_forecast_postcode('GB', 'b170hs'))
+# print('get_forecast_city_country',
+#       met_office_client.get_forecast_city_country("Birmingham", "uk"))
 
 
 # BBC Weather RSS
