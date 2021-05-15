@@ -215,10 +215,6 @@ class OpenWeatherClient(WeatherDataClient):
     def process_data(self):
         pass
 
-    def get_forecast_postcode(self, country, postcode):
-        lat, lon = self.geocode_postcode(country, postcode)
-        self.get_forecast_lat_lon(lat, lon)
-
     def get_forecast_city_country(self):
         pass
 
@@ -232,12 +228,16 @@ class OpenWeatherClient(WeatherDataClient):
         response = requests.get(self.base_url, params=params)
         return response.json()
 
+    def get_forecast_postcode(self, country, postcode):
+        lat, lon = self.geocode_postcode(country, postcode)
+        return self.get_forecast_lat_lon(lat, lon)
 
-# open_weather = OpenWeatherClient()
+
+open_weather = OpenWeatherClient()
 # print('get_forecast_lat_lon', open_weather.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
-# print('get_forecast_postcode',
-#       open_weather.get_forecast_postcode('GB', 'b170hs'))
+print('get_forecast_postcode',
+      open_weather.get_forecast_postcode('GB', 'b17 0hs'))
 # print('get_forecast_city_country',
 #       met_office_client.get_forecast_city_country("Birmingham", "uk"))
 
