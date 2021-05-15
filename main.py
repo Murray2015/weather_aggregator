@@ -5,6 +5,8 @@ from abc import ABC
 from math import radians, cos, sin, asin, sqrt
 from xml.etree import ElementTree
 import pgeocode
+from datetime import datetime, timedelta
+from definitions import *
 
 
 # Load env variables
@@ -23,18 +25,27 @@ class WeatherDataClient():
     def __init__(self):
         raise NotImplementedError
 
-    def get_forecast(self):
+    def get_forecast_lat_lon(self, lat: float, lon: float):
+        raise NotImplementedError
+
+    def get_forecast_postcode(self, postcode: str):
+        raise NotImplementedError
+
+    def get_forecast_city_country(self, city: str, country: str):
         raise NotImplementedError
 
     @staticmethod
-    def geocode_postcode(country, postcode):
+    def geocode_postcode(country_code: str, postcode: str) -> tuple:
         """Returns the lat and lon of the nearest point to the provided postcode"""
-        nomi = pgeocode.Nominatim(country)
+        if country_code not in pgeocode.COUNTRIES_VALID:
+            raise ValueError("Country code must be one of: " +
+                             ', '.join(pgeocode.COUNTRIES_VALID))
+        nomi = pgeocode.Nominatim(country_code)
         query = nomi.query_postal_code(postcode)
         return (query['latitude'], query['longitude'])
 
     @staticmethod
-    def haversine(lat1, lon1, lat2, lon2):
+    def haversine(lat1: str, lon1: str, lat2: str, lon2: str) -> float:
         """
         Calculate the great circle distance between two points 
         on the earth (specified in decimal degrees)
@@ -58,7 +69,7 @@ class MetOfficeClient(WeatherDataClient):
     def __init__(self):
         self.base_url = "http://datapoint.metoffice.gov.uk/public/data/"
         self.locations = self.load_locations()
-        self.location_code = 355998
+        self.location_code = None
 
     def load_locations(self):
         locations_response = requests.get(
@@ -89,6 +100,34 @@ class MetOfficeClient(WeatherDataClient):
         # Sort on distances and return closest
         return sorted(locations, key=lambda x: x['dist'])[0]
 
+    def process_data(self, data):
+        '''Takes raw met office data and processes into a list of dicts'''
+
+        processed_weather_data = []
+        lat = float(data['SiteRep']['DV']['Location']['lat'])
+        lon = float(data['SiteRep']['DV']['Location']['lon'])
+        place_name = data['SiteRep']['DV']['Location']['name']
+        for day in data['SiteRep']['DV']['Location']['Period']:
+            for three_hourly in day['Rep']:
+                processed_data = {
+                    'lat': lat,
+                    'lon': lon,
+                    'place_name': place_name,
+                    'date_time': datetime.strptime(day['value'], '%Y-%M-%dZ') + timedelta(minutes=int(three_hourly['$'])),
+                    'temperature_celcius': float(three_hourly['T']),
+                    'feels_like_temperature_celcius': float(three_hourly['F']),
+                    'wind_gust_mph': float(three_hourly['G']),
+                    'relative_humidity_percentage': float(three_hourly['H']),
+                    'visibility': visibility_lookup_codes[three_hourly['V']],
+                    'wind_direction': three_hourly['D'],
+                    'wind_speed_mph': float(three_hourly['S']),
+                    'uv_index': {'code': three_hourly['U'], 'description': uv_lookup_codes[str(three_hourly['U'])]},
+                    'weather_type': weather_lookup_codes[three_hourly['W']],
+                    'precipitation_probability_percentage': float(three_hourly['Pp']),
+                }
+                processed_weather_data.append(processed_data)
+        return processed_weather_data
+
     def get_forecast(self, location_code=None):
         if not location_code:
             location_code = self.location_code
@@ -96,12 +135,27 @@ class MetOfficeClient(WeatherDataClient):
             f"{self.base_url}val/wxfcs/all/json/{location_code}?res=3hourly&key={MET_OFFICE_API_KEY}")
         return data.json()
 
+    def get_forecast_lat_lon(self, lat: float, lon: float):
+        """
+        Return 3 days of forecast data based on the provided lat and lon
+        """
+        closest_location_id = self.get_closest_location(lat, lon)['id']
+        forecast = self.get_forecast(location_code=closest_location_id)
+        processed_data = self.process_data(forecast)
+        print("Processed data:", processed_data)
+
+    def get_forecast_postcode(self, country, postcode):
+        lat, lon = self.geocode_postcode(country, postcode)
+        self.get_forecast_lat_lon(lat, lon)
+
 
 # Met office testing
-# met_office_client = MetOfficeClient()
-# # print("data", met_office_client.get_forecast())
-# print("code", met_office_client.get_location_code("Lizard Lighthouse"))
-# print("code", met_office_client.get_location_code(lat=50.73862, lon=-2.90325))
+met_office_client = MetOfficeClient()
+# print('get_forecast_lat_lon', met_office_client.get_forecast_lat_lon(
+#     lat=50.73862, lon=-2.90325))
+print('get_forecast_postcode',
+      met_office_client.get_forecast_postcode('GB', 'b170hs'))
+# print('get_forecast_city_country', met_office_client.get_forecast_city_country("Birmingham", "uk"))
 
 
 # BBC Weather RSS
@@ -167,9 +221,9 @@ class AccuWeatherClient(WeatherDataClient):
         print(response.text)
 
 
-accuweather = AccuWeatherClient()
-accuweather.get_location_code(lat=52.5, lon=-2)
-accuweather.get_forecast()
+# accuweather = AccuWeatherClient()
+# accuweather.get_location_code(lat=52.5, lon=-2)
+# accuweather.get_forecast()
 
 
 class TomorrowIOClient(WeatherDataClient):
@@ -249,5 +303,55 @@ class WeatherApiClient(WeatherDataClient):
         print(response.json())
 
 
-weather_api = WeatherApiClient()
-weather_api.get_forecast("Birmingham")
+# weather_api = WeatherApiClient()
+# weather_api.get_forecast("Birmingham")
+
+
+# Sandbox
+
+
+'''
+# Define a common lexicon
+temperature
+feels_like_temperature
+wind_gust
+relative_humidity
+visibility
+wind_direction
+wind_speed
+uv_index
+weather_type
+precipitation_probability
+
+# Define a common data model
+[
+    {
+        'date_time': 'iso date',
+        'temperature_celcius': 14,
+        'feels_like_temperature_celcius': 14,
+        'wind_gust_mph': 14,
+        'relative_humidity_percentage': 14,
+        'visibility': 14,
+        'wind_direction': 14,
+        'wind_speed_mph': 14,
+        'uv_index': 14,
+        'weather_type': 14,
+        'precipitation_probability_percentage': 14,
+    },
+    {
+        'date_time': 'iso date',
+        'temperature_celcius': 14,
+        'feels_like_temperature_celcius': 14,
+        'wind_gust_mph': 14,
+        'relative_humidity_percentage': 14,
+        'visibility': 14,
+        'wind_direction': 14,
+        'wind_speed_mph': 14,
+        'uv_index': 14,
+        'weather_type': 14,
+        'precipitation_probability_percentage': 14,
+    },
+    etc
+]
+
+'''
