@@ -1,0 +1,3 @@
+# Weather aggregator
+
+A project all about getting a lot of weather forecasts - because they're all wrong, but maybe taken together they're better than the sum of their parts...

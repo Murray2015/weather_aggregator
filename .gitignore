@@ -1,3 +1,5 @@
 .env
 .vscode
 weather_venv
+.scannerwork
+__pycache__
