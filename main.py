@@ -264,37 +264,63 @@ class OpenWeatherClient(WeatherDataClient):
         return self.get_forecast_lat_lon(lat, lon)
 
 
-open_weather = OpenWeatherClient()
+# open_weather = OpenWeatherClient()
 # print('get_forecast_lat_lon', open_weather.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
 # print('get_forecast_postcode',
 #       open_weather.get_forecast_postcode('GB', 'b17 0hs'))
-print('get_forecast_city_country',
-      open_weather.get_forecast_city_country("Birmingham", "uk"))
+# print('get_forecast_city_country',
+#       open_weather.get_forecast_city_country("Birmingham", "uk"))
 
 
 # AccuWeather
 class AccuWeatherClient(WeatherDataClient):
     def __init__(self):
-        self.url = "http://dataservice.accuweather.com/forecasts/v1/hourly/120hour/{locationKey}"
-        self.location_url = "http://dataservice.accuweather.com/locations/v1/cities/geoposition/search"
+        self.base_url = "http://dataservice.accuweather.com/"
+        self.params = {
+            'apikey': ACCUWEATHER_API_KEY,
+            'language': 'en-us',
+            'details': "true"
+        }
 
     def get_location_code(self, lat, lon):
-        endpoint = f"?apikey={ACCUWEATHER_API_KEY}&q={lat}%2C{lon}&language=en-us&details=true"
-        response = requests.get(self.location_url + endpoint)
+        endpoint = "locations/v1/cities/geoposition/search"
+        lat_lon = {'q': f'{lat},{lon}'}
+        response = requests.get(self.base_url + endpoint,
+                                params={**self.params, **lat_lon})
         response_data = response.json()
-        print(response_data)
-        self.location_code = response_data['Key']
+        return response_data['Key']
 
-    def get_forecast(self):
-        endpoint = f"/forecasts/v1/hourly/12hour/{self.location_code}?apikey={ACCUWEATHER_API_KEY}&language=en-gb&details=true&metric=true"
-        response = requests.get(self.url)
-        print(response.text)
+    def get_forecast(self, location_code):
+        endpoint = f"/forecasts/v1/hourly/12hour/{location_code}"
+        response = requests.get(self.base_url + endpoint, params=self.params)
+        return response.json()
+
+    def get_forecast_lat_lon(self, lat, lon):
+        location_code = self.get_location_code(lat, lon)
+        forecast_data = self.get_forecast(location_code=location_code)
+        return forecast_data
+
+    def process_data(self):
+        pass
+
+    def get_forecast_postcode(self, country, postcode):
+        lat, lon = self.geocode_postcode(country, postcode)
+        location_code = self.get_location_code(lat, lon)
+        forecast_data = self.get_forecast(location_code=location_code)
+        return forecast_data
+
+    def get_forecast_city_country(self):
+        pass
 
 
-# accuweather = AccuWeatherClient()
-# accuweather.get_location_code(lat=52.5, lon=-2)
-# accuweather.get_forecast()
+accuweather = AccuWeatherClient()
+# print('accuweather get_forecast_lat_lon', accuweather.get_forecast_lat_lon(
+#     lat=50.73862, lon=-2.90325))
+print('accuweather get_forecast_postcode',
+      accuweather.get_forecast_postcode('GB', 'b17 0hs'))
+# print('accuweather get_forecast_city_country',
+#       accuweather.get_forecast_city_country("Birmingham", "uk"))
 
 
 class TomorrowIOClient(WeatherDataClient):
