@@ -7,7 +7,7 @@ from xml.etree import ElementTree
 import pgeocode
 from geopy.geocoders import Nominatim
 from datetime import datetime, timedelta
-import numpy as np
+from typing import Tuple
 
 from definitions import *
 
@@ -45,7 +45,7 @@ class WeatherDataClient(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def geocode_postcode(country_code: str, postcode: str) -> tuple(float, float):
+    def geocode_postcode(country_code: str, postcode: str) -> Tuple[float, float]:
         """Returns the lat and lon of the nearest point to the provided postcode"""
         if country_code not in pgeocode.COUNTRIES_VALID:
             raise ValueError("Country code must be one of: " +
@@ -54,10 +54,10 @@ class WeatherDataClient(ABC):
         query = nomi.query_postal_code(postcode)
         if str(query['latitude']) == 'nan' or str(query['longitude']) == 'nan':
             raise ValueError("Couldn't geocode that postcode.")
-        return (query['latitude'], query['longitude'])
+        return query['latitude'], query['longitude']
 
     @staticmethod
-    def geocode_city_country(city: str, country: str) -> tuple(float, float):
+    def geocode_city_country(city: str, country: str) -> Tuple[float, float]:
         """Returns the lat / lon of the city / country combination"""
         geolocator = Nominatim(user_agent="my_test")
         location = geolocator.geocode(f"{city}, {country}")
@@ -174,7 +174,7 @@ class MetOfficeClient(WeatherDataClient):
 
 
 # Met office testing
-met_office_client = MetOfficeClient()
+# met_office_client = MetOfficeClient()
 # print('Met office get_forecast_lat_lon', met_office_client.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
 # print('Met office get_forecast_postcode',
@@ -211,28 +211,53 @@ class BBCClient(WeatherDataClient):
 
 # Open Weather
 class OpenWeatherClient(WeatherDataClient):
+    """ Openweather API client class """
+
     def __init__(self):
         self.exclude = "minutely"
         self.base_url = f"https://api.openweathermap.org/data/2.5/onecall"
 
-    def get_forecast(self):
-        pass
-
-    def process_data(self):
-        pass
+    def process_data(self, raw_data):
+        data = []
+        lat = raw_data['lat']
+        lon = raw_data['lon']
+        # Possibly use met office for this? Need a common set of names...
+        place_name = None
+        for hourly in [raw_data['current'], *raw_data['hourly']]:
+            processed_data = {
+                'lat': lat,
+                'lon': lon,
+                'place_name': place_name,
+                'date_time': datetime.fromtimestamp(hourly['dt']),
+                'temperature_celcius': float(hourly['temp']),
+                'feels_like_temperature_celcius': float(hourly['feels_like']),
+                'wind_gust_mph': float(hourly.get('wind_gust', no_data_value)),
+                'relative_humidity_percentage': float(hourly['humidity']),
+                'visibility': open_weather_visibility_lookup(hourly['visibility']),
+                'wind_direction': open_weather_wind_direction_lookup(hourly['wind_deg']),
+                'wind_speed_mph': float(hourly['wind_speed']),
+                'uv_index': {'code': hourly['uvi'], 'description': uv_lookup_codes[str(int(hourly['uvi']))]},
+                'weather_type': hourly['weather'][0]['description'],
+                'precipitation_probability_percentage': float(hourly.get('pop', no_data_value)),
+            }
+            data.append(processed_data)
+        return data
 
     def get_forecast_city_country(self, city, country):
         lat, lon = self.geocode_city_country(city, country)
+        return self.get_forecast_lat_lon(lat, lon)
 
     def get_forecast_lat_lon(self, lat, lon):
         params = {
             'lat': lat,
             'lon': lon,
             'exclude': self.exclude,
-            'appid': OPEN_WEATHER_API_KEY
+            'appid': OPEN_WEATHER_API_KEY,
+            'units': 'metric'
         }
         response = requests.get(self.base_url, params=params)
-        return response.json()
+        data = self.process_data(response.json())
+        return data
 
     def get_forecast_postcode(self, country, postcode):
         lat, lon = self.geocode_postcode(country, postcode)
