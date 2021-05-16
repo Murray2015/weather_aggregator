@@ -45,7 +45,7 @@ class WeatherDataClient(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def geocode_postcode(country_code: str, postcode: str) -> tuple:
+    def geocode_postcode(country_code: str, postcode: str) -> tuple(float, float):
         """Returns the lat and lon of the nearest point to the provided postcode"""
         if country_code not in pgeocode.COUNTRIES_VALID:
             raise ValueError("Country code must be one of: " +
@@ -55,6 +55,13 @@ class WeatherDataClient(ABC):
         if str(query['latitude']) == 'nan' or str(query['longitude']) == 'nan':
             raise ValueError("Couldn't geocode that postcode.")
         return (query['latitude'], query['longitude'])
+
+    @staticmethod
+    def geocode_city_country(city: str, country: str) -> tuple(float, float):
+        """Returns the lat / lon of the city / country combination"""
+        geolocator = Nominatim(user_agent="my_test")
+        location = geolocator.geocode(f"{city}, {country}")
+        return location.latitude, location.longitude
 
     @staticmethod
     def haversine(lat1: str, lon1: str, lat2: str, lon2: str) -> float:
@@ -154,26 +161,25 @@ class MetOfficeClient(WeatherDataClient):
         closest_location_id = self.get_closest_location(lat, lon)['id']
         forecast = self.get_forecast(location_code=closest_location_id)
         processed_data = self.process_data(forecast)
-        print("Processed data:", processed_data)
+        return processed_data
 
     def get_forecast_postcode(self, country, postcode):
         lat, lon = self.geocode_postcode(country, postcode)
-        self.get_forecast_lat_lon(lat, lon)
+        return self.get_forecast_lat_lon(lat, lon)
 
     def get_forecast_city_country(self, city, country):
-        geolocator = Nominatim(user_agent="my_test")
-        location = geolocator.geocode(f"{city}, {country}")
-        self.get_forecast_lat_lon(
-            lat=location.latitude, lon=location.longitude)
+        lat, lon = self.geocode_city_country(city, country)
+        return self.get_forecast_lat_lon(
+            lat=lat, lon=lon)
 
 
 # Met office testing
-# met_office_client = MetOfficeClient()
-# print('get_forecast_lat_lon', met_office_client.get_forecast_lat_lon(
+met_office_client = MetOfficeClient()
+# print('Met office get_forecast_lat_lon', met_office_client.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
-# print('get_forecast_postcode',
+# print('Met office get_forecast_postcode',
 #       met_office_client.get_forecast_postcode('GB', 'b17 0hs'))
-# print('get_forecast_city_country',
+# print('Met office get_forecast_city_country',
 #       met_office_client.get_forecast_city_country("Birmingham", "uk"))
 
 
@@ -215,8 +221,8 @@ class OpenWeatherClient(WeatherDataClient):
     def process_data(self):
         pass
 
-    def get_forecast_city_country(self):
-        pass
+    def get_forecast_city_country(self, city, country):
+        lat, lon = self.geocode_city_country(city, country)
 
     def get_forecast_lat_lon(self, lat, lon):
         params = {
@@ -236,10 +242,10 @@ class OpenWeatherClient(WeatherDataClient):
 open_weather = OpenWeatherClient()
 # print('get_forecast_lat_lon', open_weather.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
-print('get_forecast_postcode',
-      open_weather.get_forecast_postcode('GB', 'b17 0hs'))
-# print('get_forecast_city_country',
-#       met_office_client.get_forecast_city_country("Birmingham", "uk"))
+# print('get_forecast_postcode',
+#       open_weather.get_forecast_postcode('GB', 'b17 0hs'))
+print('get_forecast_city_country',
+      open_weather.get_forecast_city_country("Birmingham", "uk"))
 
 
 # AccuWeather
