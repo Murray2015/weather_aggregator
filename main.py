@@ -36,13 +36,14 @@ class WeatherDataClient(ABC):
     def get_forecast_lat_lon(self, lat: float, lon: float):
         raise NotImplementedError
 
-    @abstractmethod
-    def get_forecast_postcode(self, postcode: str):
-        raise NotImplementedError
+    def get_forecast_postcode(self, country: str, postcode: str):
+        lat, lon = self.geocode_postcode(country, postcode)
+        return self.get_forecast_lat_lon(lat, lon)
 
-    @abstractmethod
-    def get_forecast_city_country(self, city: str, country: str):
-        raise NotImplementedError
+    def get_forecast_city_country(self, city, country):
+        lat, lon = self.geocode_city_country(city, country)
+        return self.get_forecast_lat_lon(
+            lat=lat, lon=lon)
 
     @staticmethod
     def geocode_postcode(country_code: str, postcode: str) -> Tuple[float, float]:
@@ -163,15 +164,6 @@ class MetOfficeClient(WeatherDataClient):
         processed_data = self.process_data(forecast)
         return processed_data
 
-    def get_forecast_postcode(self, country, postcode):
-        lat, lon = self.geocode_postcode(country, postcode)
-        return self.get_forecast_lat_lon(lat, lon)
-
-    def get_forecast_city_country(self, city, country):
-        lat, lon = self.geocode_city_country(city, country)
-        return self.get_forecast_lat_lon(
-            lat=lat, lon=lon)
-
 
 # Met office testing
 # met_office_client = MetOfficeClient()
@@ -243,10 +235,6 @@ class OpenWeatherClient(WeatherDataClient):
             data.append(processed_data)
         return data
 
-    def get_forecast_city_country(self, city, country):
-        lat, lon = self.geocode_city_country(city, country)
-        return self.get_forecast_lat_lon(lat, lon)
-
     def get_forecast_lat_lon(self, lat, lon):
         params = {
             'lat': lat,
@@ -259,12 +247,8 @@ class OpenWeatherClient(WeatherDataClient):
         data = self.process_data(response.json())
         return data
 
-    def get_forecast_postcode(self, country, postcode):
-        lat, lon = self.geocode_postcode(country, postcode)
-        return self.get_forecast_lat_lon(lat, lon)
 
-
-# open_weather = OpenWeatherClient()
+open_weather = OpenWeatherClient()
 # print('get_forecast_lat_lon', open_weather.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
 # print('get_forecast_postcode',
@@ -303,7 +287,6 @@ class AccuWeatherClient(WeatherDataClient):
         return forecast_data
 
     def process_data(self, data, lat, lon):
-        print(data)
         processed_weather_data = []
         place_name = None
         for hourly in data:
@@ -340,26 +323,61 @@ class AccuWeatherClient(WeatherDataClient):
         return processed_data
 
 
-accuweather = AccuWeatherClient()
+# accuweather = AccuWeatherClient()
 # print('accuweather get_forecast_lat_lon', accuweather.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
 # print('accuweather get_forecast_postcode',
 #       accuweather.get_forecast_postcode('GB', 'b17 0hs'))
-print('accuweather get_forecast_city_country',
-      accuweather.get_forecast_city_country("Birmingham", "uk"))
+# print('accuweather get_forecast_city_country',
+#       accuweather.get_forecast_city_country("Birmingham", "uk"))
 
 
 class TomorrowIOClient(WeatherDataClient):
     def __init__(self):
-        self.url = f'https://api.tomorrow.io/v4/timelines?location=-73.98529171943665,40.75872069597532&fields=temperature,precipitationIntensity,precipitationType,windSpeed,windGust,windDirection,temperature,temperatureApparent,cloudCover,cloudBase,cloudCeiling,weatherCode&timesteps=1h&units=metric&apikey={TOMORROW_API_KEY}'
+        self.base_url = f'https://api.tomorrow.io/v4/timelines'
+        self.params = {
+            'fields': 'temperature,precipitationIntensity,precipitationType,windSpeed,windGust,windDirection,temperature,temperatureApparent,cloudCover,cloudBase,cloudCeiling,humidity,visibility,weatherCode,precipitationProbability', 'timesteps': '1h',
+            'units': 'metric',
+            'apikey': TOMORROW_API_KEY
+        }
 
-    def get_forecast(self):
-        res = requests.get(self.url)
-        print(res.content)
+    def get_forecast_lat_lon(self, lat, lon):
+        params = {**self.params, 'location': f"{lat},{lon}"}
+        response = requests.get(self.base_url, params=params)
+        raw_data = response.json()
+        return self.process_data(raw_data, lat, lon)
+
+    def process_data(self, data, lat, lon):
+        processed_weather_data = []
+        place_name = None
+        for hourly in data['data']['timelines'][0]['intervals']:
+            processed_data = {
+                'lat': lat,
+                'lon': lon,
+                'place_name': place_name,
+                'date_time': datetime.strptime(hourly['startTime'], '%Y-%m-%dT%H:%M:%S%z'),
+                'temperature_celcius': float(hourly['values']['temperature']),
+                'feels_like_temperature_celcius': float(hourly['values']['temperatureApparent']),
+                'wind_speed_kph': float(hourly['values']['windSpeed']),
+                'wind_direction': open_weather_wind_direction_lookup(hourly['values']['windDirection']),
+                'wind_gust_mph': float(hourly['values']['windGust']),
+                'relative_humidity_percentage': float(hourly['values']['humidity']),
+                'visibility': open_weather_visibility_lookup(hourly['values']['visibility']),
+                'uv_index': None,
+                'weather_type': tomorrow_io_weather_code_lookup[hourly['values']['weatherCode']],
+                'precipitation_probability_percentage': float(hourly['values']['precipitationProbability']),
+            }
+            processed_weather_data.append(processed_data)
+        return processed_weather_data
 
 
-# tomorrow_io = TomorrowIOClient()
-# tomorrow_io.get_forecast()
+tomorrow_io = TomorrowIOClient()
+# print('tomorrow_io get_forecast_lat_lon', tomorrow_io.get_forecast_lat_lon(
+#     lat=50.73862, lon=-2.90325))
+# print('tomorrow_io get_forecast_postcode',
+#       tomorrow_io.get_forecast_postcode('GB', 'b17 0hs'))
+print('tomorrow_io get_forecast_city_country',
+      tomorrow_io.get_forecast_city_country("Birmingham", "uk"))
 
 
 class TheRaineryClient(WeatherDataClient):
