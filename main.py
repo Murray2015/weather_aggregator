@@ -371,31 +371,60 @@ class TomorrowIOClient(WeatherDataClient):
         return processed_weather_data
 
 
-tomorrow_io = TomorrowIOClient()
+# tomorrow_io = TomorrowIOClient()
 # print('tomorrow_io get_forecast_lat_lon', tomorrow_io.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
 # print('tomorrow_io get_forecast_postcode',
 #       tomorrow_io.get_forecast_postcode('GB', 'b17 0hs'))
-print('tomorrow_io get_forecast_city_country',
-      tomorrow_io.get_forecast_city_country("Birmingham", "uk"))
+# print('tomorrow_io get_forecast_city_country',
+#       tomorrow_io.get_forecast_city_country("Birmingham", "uk"))
 
 
 class TheRaineryClient(WeatherDataClient):
     def __init__(self):
         self.headers = {'x-api-key': THE_RAINERY_API_KEY}
+        self.base_url = 'https://api.therainery.com/forecast/weather'
 
-    def get_forecast(self):
-        response = requests.get('https://api.therainery.com/forecast/weather',
-                                params={
-                                    'latitude': 48.8582,
-                                    'longitude': 2.2945,
-                                }, headers=self.headers)
+    def get_forecast_lat_lon(self, lat, lon):
+        response = requests.get(self.base_url, params={'latitude': lat,
+                                                       'longitude': lon}, headers=self.headers)
+        raw_data = response.json()
+        return self.process_data(raw_data)
 
-        print(response.text)
+    def process_data(self, data: any):
+        processed_weather_data = []
+        lat = data['meta']['latitude']
+        lon = data['meta']['longitude']
+        place_name = None
+        for hourly in data['data']:
+            processed_data = {
+                'lat': lat,
+                'lon': lon,
+                'place_name': place_name,
+                'date_time': datetime.fromtimestamp(hourly['timestamp']),
+                'temperature_celcius': float(hourly['airTemperature']),
+                'feels_like_temperature_celcius': None,
+                'wind_speed_kph': float(hourly['windSpeed']),
+                'wind_direction': open_weather_wind_direction_lookup(hourly['windDirection']),
+                'wind_gust_mph': float(hourly['gust']),
+                'relative_humidity_percentage': float(hourly['relativeHumidity']),
+                'visibility': open_weather_visibility_lookup(hourly['horizontalVisibility']),
+                'uv_index': None,
+                'weather_type': None,
+                'precipitation_probability_percentage': None,
+            }
+            processed_weather_data.append(processed_data)
+        return processed_weather_data
 
 
 # the_rainery = TheRaineryClient()
-# the_rainery.get_forecast()
+# print('the_rainery get_forecast_lat_lon', the_rainery.get_forecast_lat_lon(
+#     lat=50.73862, lon=-2.90325))
+# print('the_rainery get_forecast_postcode',
+#       the_rainery.get_forecast_postcode('GB', 'b17 0hs'))
+# print('the_rainery get_forecast_city_country',
+#       the_rainery.get_forecast_city_country("Birmingham", "uk"))
+
 
 class StormGlassClient(WeatherDataClient):
     def __init__(self):
