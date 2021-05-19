@@ -468,13 +468,13 @@ class StormGlassClient(WeatherDataClient):
         return processed_weather_data
 
 
-storm_glass = StormGlassClient()
+# storm_glass = StormGlassClient()
 # print('the_rainery get_forecast_lat_lon', storm_glass.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
 # print('storm_glass get_forecast_postcode',
 #       storm_glass.get_forecast_postcode('GB', 'b17 0hs'))
-print('storm_glass get_forecast_city_country',
-      storm_glass.get_forecast_city_country("Birmingham", "uk"))
+# print('storm_glass get_forecast_city_country',
+#       storm_glass.get_forecast_city_country("Birmingham", "uk"))
 
 
 class WeatherbitIoClient(WeatherDataClient):
@@ -482,18 +482,44 @@ class WeatherbitIoClient(WeatherDataClient):
         self.base_url = "http://api.weatherbit.io/v2.0/forecast/hourly"
         self.endpoint = F"?lang=en&key={WEATHERBIT_IO_API_KEY}"
 
-    def get_forecast(self, city=None, country=None, lat=None, lon=None):
-        if city and country:
-            response = requests.get(
-                self.base_url + self.endpoint + f"&city={city}&country={country}")
-        elif lat and lon:
-            response = requests.get(
-                self.base_url + self.endpoint + f"&lat={lat}&lon={lon}")
-        print(response.json())
+    def get_forecast_lat_lon(self, lat, lon):
+        response = requests.get(
+            self.base_url + self.endpoint, params={'lat': lat, 'lon': lon})
+        return self.process_data(response.json())
+
+    def process_data(self, data: any):
+        processed_weather_data = []
+        lat = data['lat']
+        lon = data['lon']
+        place_name = data['city_name']
+        for hourly in data['data']:
+            processed_data = {
+                'lat': lat,
+                'lon': lon,
+                'place_name': place_name,
+                'date_time': datetime.fromisoformat(hourly['timestamp_local']),
+                'temperature_celcius': float(hourly['temp']),
+                'feels_like_temperature_celcius': float(hourly['app_temp']),
+                'wind_speed_kph': float(hourly['wind_spd']),
+                'wind_direction': weatherbit_wind_direction_lookup[hourly['wind_cdir_full']],
+                'wind_gust_mph': float(hourly['wind_gust_spd']),
+                'relative_humidity_percentage': None,
+                'visibility': open_weather_visibility_lookup(hourly['vis'] * 1000),
+                'uv_index': {'code': hourly['uv'], 'description': uv_lookup_codes[str(int(hourly['uv']))]},
+                'weather_type': weatherbit_weather_code_lookup[str(hourly['weather']['code'])],
+                'precipitation_probability_percentage': hourly['pop'],
+            }
+            processed_weather_data.append(processed_data)
+        return processed_weather_data
 
 
-# weatherbit_io = WeatherbitIoClient()
-# weatherbit_io.get_forecast(city="Birmingham", country="UK")
+weatherbit_io = WeatherbitIoClient()
+# print('the_rainery get_forecast_lat_lon', weatherbit_io.get_forecast_lat_lon(
+#     lat=50.73862, lon=-2.90325))
+# print('weatherbit_io get_forecast_postcode',
+#       weatherbit_io.get_forecast_postcode('GB', 'b17 0hs'))
+print('weatherbit_io get_forecast_city_country',
+      weatherbit_io.get_forecast_city_country("Birmingham", "uk"))
 
 
 class WeatherApiClient(WeatherDataClient):
