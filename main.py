@@ -513,74 +513,57 @@ class WeatherbitIoClient(WeatherDataClient):
         return processed_weather_data
 
 
-weatherbit_io = WeatherbitIoClient()
+# weatherbit_io = WeatherbitIoClient()
 # print('the_rainery get_forecast_lat_lon', weatherbit_io.get_forecast_lat_lon(
 #     lat=50.73862, lon=-2.90325))
 # print('weatherbit_io get_forecast_postcode',
 #       weatherbit_io.get_forecast_postcode('GB', 'b17 0hs'))
-print('weatherbit_io get_forecast_city_country',
-      weatherbit_io.get_forecast_city_country("Birmingham", "uk"))
+# print('weatherbit_io get_forecast_city_country',
+#       weatherbit_io.get_forecast_city_country("Birmingham", "uk"))
 
 
 class WeatherApiClient(WeatherDataClient):
     def __init__(self):
         self.base_url = f"http://api.weatherapi.com/v1/"
 
-    def get_forecast(self, city=None, postcode=None):
-        endpoint = f"forecast.json?key={WEATHER_API_KEY}&q={city or postcode}&days=3&aqi=no&alerts=no"
-        response = requests.get(self.base_url + endpoint)
+    def get_forecast_lat_lon(self, lat, lon):
+        endpoint = "forecast.json"
+        response = requests.get(self.base_url + endpoint, params={'key': WEATHER_API_KEY,
+                                                                  'q': f"{lat},{lon}", 'days': 5, 'aqi': 'no', 'alerts': 'no'})
         print(response.json())
 
+    def process_data(self, data: any):
+        processed_weather_data = []
+        lat = data['location']['lat']
+        lon = data['location']['lon']
+        place_name = data['location']['name'] + \
+            data['location']['region'] + data['location']['country']
+        for day in data['forecast']['forecastday']:
+            for hourly in day['hour']:
+                processed_data = {
+                    'lat': lat,
+                    'lon': lon,
+                    'place_name': place_name,
+                    'date_time': datetime.fromtimestamp(hourly['time_epoch']),
+                    'temperature_celcius': float(hourly['temp_c']),
+                    'feels_like_temperature_celcius': float(hourly['feelslike_c']),
+                    'wind_speed_kph': float(hourly['wind_kph']),
+                    'wind_direction': hourly['wind_dir'],
+                    'wind_gust_kph': float(hourly['gust_kph']),
+                    'relative_humidity_percentage': float(hourly['humidity']),
+                    'visibility': open_weather_visibility_lookup(hourly['vis_km'] * 1000),
+                    'uv_index': {'code': hourly['uv'], 'description': uv_lookup_codes[str(int(hourly['uv']))]},
+                    'weather_type': hourly['condition']['text'],
+                    'precipitation_probability_percentage': hourly['chance_of_rain'],
+                }
+                processed_weather_data.append(processed_data)
+        return processed_weather_data
 
-# weather_api = WeatherApiClient()
-# weather_api.get_forecast("Birmingham")
 
-
-# Sandbox
-
-
-'''
-# Define a common lexicon
-temperature
-feels_like_temperature
-wind_gust
-relative_humidity
-visibility
-wind_direction
-wind_speed
-uv_index
-weather_type
-precipitation_probability
-
-# Define a common data model
-[
-    {
-        'date_time': 'iso date',
-        'temperature_celcius': 14,
-        'feels_like_temperature_celcius': 14,
-        'wind_gust_mph': 14,
-        'relative_humidity_percentage': 14,
-        'visibility': 14,
-        'wind_direction': 14,
-        'wind_speed_mph': 14,
-        'uv_index': 14,
-        'weather_type': 14,
-        'precipitation_probability_percentage': 14,
-    },
-    {
-        'date_time': 'iso date',
-        'temperature_celcius': 14,
-        'feels_like_temperature_celcius': 14,
-        'wind_gust_mph': 14,
-        'relative_humidity_percentage': 14,
-        'visibility': 14,
-        'wind_direction': 14,
-        'wind_speed_mph': 14,
-        'uv_index': 14,
-        'weather_type': 14,
-        'precipitation_probability_percentage': 14,
-    },
-    etc
-]
-
-'''
+weather_api = WeatherApiClient()
+# print('the_rainery get_forecast_lat_lon', weather_api.get_forecast_lat_lon(
+#     lat=50.73862, lon=-2.90325))
+# print('weather_api get_forecast_postcode',
+#       weather_api.get_forecast_postcode('GB', 'b17 0hs'))
+# print('weather_api get_forecast_city_country',
+#       weather_api.get_forecast_city_country("Birmingham", "uk"))
