@@ -1,6 +1,8 @@
 import requests
+import json
 from datetime import datetime, timedelta
 from os import getenv
+from tornado.httpclient import AsyncHTTPClient
 
 from .base import WeatherDataClient
 from .utils.definitions import visibility_lookup_codes, uv_lookup_codes, weather_lookup_codes
@@ -73,19 +75,22 @@ class MetOfficeClient(WeatherDataClient):
                 processed_weather_data.append(processed_data)
         return processed_weather_data
 
-    def get_forecast(self, location_code=None):
+    async def get_forecast(self, location_code=None):
         if not location_code:
             location_code = self.location_code
-        data = requests.get(
-            f"{self.base_url}val/wxfcs/all/json/{location_code}?res=3hourly&key={MET_OFFICE_API_KEY}")
-        return data.json()
+        try:
+            http_client = AsyncHTTPClient()
+            response = await http_client.fetch(f"{self.base_url}val/wxfcs/all/json/{location_code}?res=3hourly&key={MET_OFFICE_API_KEY}")
+        except Exception as e:
+            print("Error: %s" % e)
+        return json.loads(response.body)
 
-    def get_forecast_lat_lon(self, lat: float, lon: float):
+    async def get_forecast_lat_lon(self, lat: float, lon: float):
         """
         Return 3 days of forecast data based on the provided lat and lon
         """
         closest_location_id = self.get_closest_location(lat, lon)['id']
-        forecast = self.get_forecast(location_code=closest_location_id)
+        forecast = await self.get_forecast(location_code=closest_location_id)
         processed_data = self.process_data(forecast)
         return processed_data
 

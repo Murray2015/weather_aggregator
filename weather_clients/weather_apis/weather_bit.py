@@ -1,6 +1,10 @@
 from datetime import datetime
+from json import loads
 import requests
 from os import getenv
+
+from tornado.httpclient import AsyncHTTPClient
+from tornado.httputil import url_concat
 
 from .base import WeatherDataClient
 from .utils.definitions import weatherbit_wind_direction_lookup, open_weather_visibility_lookup, uv_lookup_codes, weatherbit_weather_code_lookup
@@ -14,10 +18,12 @@ class WeatherbitIoClient(WeatherDataClient):
         self.base_url = "http://api.weatherbit.io/v2.0/forecast/hourly"
         self.endpoint = F"?lang=en&key={WEATHERBIT_IO_API_KEY}"
 
-    def get_forecast_lat_lon(self, lat, lon):
-        response = requests.get(
-            self.base_url + self.endpoint, params={'lat': lat, 'lon': lon})
-        return self.process_data(response.json())
+    async def get_forecast_lat_lon(self, lat, lon):
+        http_client = AsyncHTTPClient()
+        response = await http_client.fetch(
+            url_concat(self.base_url + self.endpoint, {'lat': lat, 'lon': lon})
+        )
+        return self.process_data(loads(response.body))
 
     def process_data(self, data: any):
         processed_weather_data = []

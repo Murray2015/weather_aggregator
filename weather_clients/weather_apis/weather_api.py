@@ -1,6 +1,10 @@
 from datetime import datetime
+from json import loads
 import requests
 from os import getenv
+
+from tornado.httpclient import AsyncHTTPClient
+from tornado.httputil import url_concat
 
 from .base import WeatherDataClient
 from .utils.definitions import open_weather_visibility_lookup, uv_lookup_codes
@@ -13,12 +17,14 @@ class WeatherApiClient(WeatherDataClient):
     def __init__(self):
         self.base_url = f"http://api.weatherapi.com/v1/"
 
-    def get_forecast_lat_lon(self, lat, lon):
+    async def get_forecast_lat_lon(self, lat, lon):
         endpoint = "forecast.json"
-        response = requests.get(self.base_url + endpoint, params={'key': WEATHER_API_KEY,
-                                                                  'q': f"{lat},{lon}", 'days': 5, 'aqi': 'no', 'alerts': 'no'})
-        # print(response.json())
-        return response.json()
+        http_client = AsyncHTTPClient()
+
+        response = await http_client.fetch(url_concat(self.base_url + endpoint,
+                                                      {'key': WEATHER_API_KEY,
+                                                       'q': f"{lat},{lon}", 'days': 5, 'aqi': 'no', 'alerts': 'no'}))
+        return loads(response.body)
 
     def process_data(self, data: any):
         processed_weather_data = []

@@ -1,6 +1,9 @@
-import requests
+import json
 from datetime import datetime
 from os import getenv
+
+from tornado.httpclient import AsyncHTTPClient
+from tornado.httputil import url_concat
 
 from .base import WeatherDataClient
 from .utils.definitions import open_weather_wind_direction_lookup, open_weather_visibility_lookup
@@ -14,10 +17,11 @@ class TheRaineryClient(WeatherDataClient):
         self.headers = {'x-api-key': THE_RAINERY_API_KEY}
         self.base_url = 'https://api.therainery.com/forecast/weather'
 
-    def get_forecast_lat_lon(self, lat, lon):
-        response = requests.get(self.base_url, params={'latitude': lat,
-                                                       'longitude': lon}, headers=self.headers)
-        raw_data = response.json()
+    async def get_forecast_lat_lon(self, lat, lon):
+        http_client = AsyncHTTPClient()
+
+        response = await http_client.fetch(url_concat(self.base_url, {'latitude': lat, 'longitude': lon}), headers=self.headers)
+        raw_data = json.loads(response.body)
         return self.process_data(raw_data)
 
     def process_data(self, data: any):

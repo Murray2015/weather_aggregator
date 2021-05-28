@@ -1,6 +1,9 @@
-import requests
+from json import loads
 from datetime import datetime
 from os import getenv
+
+from tornado.httpclient import AsyncHTTPClient
+from tornado.httputil import url_concat
 
 from .base import WeatherDataClient
 from .utils.definitions import open_weather_wind_direction_lookup, open_weather_visibility_lookup, tomorrow_io_weather_code_lookup
@@ -19,10 +22,11 @@ class TomorrowIOClient(WeatherDataClient):
             'apikey': TOMORROW_API_KEY
         }
 
-    def get_forecast_lat_lon(self, lat, lon):
+    async def get_forecast_lat_lon(self, lat, lon):
         params = {**self.params, 'location': f"{lat},{lon}"}
-        response = requests.get(self.base_url, params=params)
-        raw_data = response.json()
+        http_client = AsyncHTTPClient()
+        response = await http_client.fetch(url_concat(self.base_url, params))
+        raw_data = loads(response.body)
         return self.process_data(raw_data, lat, lon)
 
     def process_data(self, data, lat, lon):

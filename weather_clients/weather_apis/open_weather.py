@@ -1,6 +1,9 @@
 import requests
 from datetime import datetime
 from os import getenv
+from tornado.httpclient import AsyncHTTPClient
+from tornado.httputil import url_concat
+import json
 
 from .base import WeatherDataClient
 from .utils.definitions import no_data_value, open_weather_visibility_lookup, open_weather_wind_direction_lookup, uv_lookup_codes, no_data_value
@@ -42,7 +45,7 @@ class OpenWeatherClient(WeatherDataClient):
             data.append(processed_data)
         return data
 
-    def get_forecast_lat_lon(self, lat, lon):
+    async def get_forecast_lat_lon(self, lat, lon):
         params = {
             'lat': lat,
             'lon': lon,
@@ -50,8 +53,9 @@ class OpenWeatherClient(WeatherDataClient):
             'appid': OPEN_WEATHER_API_KEY,
             'units': 'metric'
         }
-        response = requests.get(self.base_url, params=params)
-        data = self.process_data(response.json())
+        http_client = AsyncHTTPClient()
+        response = await http_client.fetch(url_concat(self.base_url, params))
+        data = self.process_data(json.loads(response.body))
         return data
 
 

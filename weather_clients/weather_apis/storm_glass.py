@@ -1,6 +1,9 @@
 from datetime import datetime
-import requests
+import json
 from os import getenv
+
+from tornado.httpclient import AsyncHTTPClient
+from tornado.httputil import url_concat
 
 from .base import WeatherDataClient
 from .utils.definitions import no_data_value, open_weather_wind_direction_lookup, open_weather_visibility_lookup
@@ -18,11 +21,12 @@ class StormGlassClient(WeatherDataClient):
         self.headers = {'Authorization': STORM_GLASS_API_KEY
                         }
 
-    def get_forecast_lat_lon(self, lat, lon):
-        response = requests.get(
-            self.base_url + self.weather_endpoint, params={**self.params, "lat": lat, "lng": lon}, headers=self.headers)
-        temp = response.json()
-        return self.process_data(response.json())
+    async def get_forecast_lat_lon(self, lat, lon):
+        http_client = AsyncHTTPClient()
+        response = await http_client.fetch(url_concat(
+            self.base_url + self.weather_endpoint, {**self.params, "lat": lat, "lng": lon}), headers=self.headers)
+        data = json.loads(response.body)
+        return self.process_data(data)
 
     def process_data(self, data: any):
         processed_weather_data = {"dwd": [], "noaa": [], "sg": []}
