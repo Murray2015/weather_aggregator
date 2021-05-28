@@ -1,0 +1,43 @@
+{% extends 'base.html' %} 
+
+{% block title %} 
+testing... 
+{% end %} 
+
+{% block body %} 
+<main class="container">
+    <h1 class="title">The weather app</h1>
+    <div class="row">
+        <h2>Where the world get's its weather</h2>
+        <div class="row">
+            <div class="col"></div>
+            <div class="col">Search by place name</div>
+            <div class="col">Search by country and postcode</div>
+            <div class="col"></div>
+        </div>
+        <div class="row">
+            <div class="col"></div>
+            <div class="col">
+                <form>
+                    <label for='lat'>Enter latitude:</label>
+                    <input id='lat'>
+                    <label for='lon'>Enter longitude:</label>
+                    <input id='lon'>
+                    <button type="submit" class="btn btn-primary">Get weather</button>
+                </form>
+            </div>
+            <div class="col">
+                <form>
+                    <label for='country'>Enter country:</label>
+                    <input id='country'>
+                    <label for='postcode'>Enter postcode:</label>
+                    <input id='postcode'>
+                    <button type="submit" class="btn btn-primary">Get weather</button>
+                </form>
+            </div>
+            <div class="col"></div>
+
+        </div>
+    </div>
+</main> 
+{% end %}
